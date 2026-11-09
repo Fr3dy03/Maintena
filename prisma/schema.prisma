@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  DISPATCHER
+  TECHNICIAN
+  REQUESTER
+  REVIEWER
+}
+
+enum WorkStatus {
+  REQUESTED
+  ASSIGNED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  MORE_INFO
+}
+
+model Organization {
+  id             String           @id @default(cuid())
+  name           String
+  createdAt      DateTime         @default(now())
+  memberships    Membership[]
+  sites          Site[]
+  assets         Asset[]
+  workOrders     WorkOrder[]
+  claims         WarrantyClaim[]
+  requests       ServiceRequest[]
+  activityEvents ActivityEvent[]
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String
+  memberships Membership[]
+  assigned    WorkOrder[]
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           Role
+  status         String       @default("active")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Site {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  locationText   String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assets         Asset[]
+  workOrders     WorkOrder[]
+}
+
+model AssetCategory {
+  id     String  @id @default(cuid())
+  name   String
+  assets Asset[]
+}
+
+model Asset {
+  id             String           @id @default(cuid())
+  organizationId String
+  siteId         String
+  categoryId     String?
+  assetCode      String           @unique
+  publicToken    String           @unique
+  serial         String
+  manufacturer   String
+  model          String
+  status         String           @default("operational")
+  installDate    DateTime
+  nextServiceDue DateTime?
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site           Site             @relation(fields: [siteId], references: [id])
+  category       AssetCategory?   @relation(fields: [categoryId], references: [id])
+  warranty       Warranty?
+  workOrders     WorkOrder[]
+  serviceRecords ServiceRecord[]
+  requests       ServiceRequest[]
+  activityEvents ActivityEvent[]
+  warrantyClaims WarrantyClaim[]
+}
+
+model Warranty {
+  id         String          @id @default(cuid())
+  assetId    String          @unique
+  provider   String
+  startsAt   DateTime
+  endsAt     DateTime
+  terms      String
+  exclusions String
+  asset      Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  claims     WarrantyClaim[]
+}
+
+model WorkOrder {
+  id             String           @id @default(cuid())
+  number         String           @unique
+  organizationId String
+  assetId        String
+  siteId         String
+  assigneeId     String?
+  summary        String
+  description    String
+  priority       Priority         @default(NORMAL)
+  status         WorkStatus       @default(REQUESTED)
+  dueAt          DateTime?
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset          Asset            @relation(fields: [assetId], references: [id])
+  site           Site             @relation(fields: [siteId], references: [id])
+  assignee       User?            @relation(fields: [assigneeId], references: [id])
+  tasks          WorkOrderTask[]
+  serviceRecords ServiceRecord[]
+  requests       ServiceRequest[]
+  activityEvents ActivityEvent[]
+}
+
+model WorkOrderTask {
+  id          String    @id @default(cuid())
+  workOrderId String
+  label       String
+  completed   Boolean   @default(false)
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+}
+
+model ServiceRecord {
+  id                 String    @id @default(cuid())
+  workOrderId        String
+  assetId            String
+  action             String
+  notes              String
+  occurredAt         DateTime  @default(now())
+  previousRecordHash String?
+  contentHash        String
+  workOrder          WorkOrder @relation(fields: [workOrderId], references: [id])
+  asset              Asset     @relation(fields: [assetId], references: [id])
+}
+
+model WarrantyClaim {
+  id             String       @id @default(cuid())
+  claimNumber    String       @unique
+  organizationId String
+  assetId        String
+  warrantyId     String
+  narrative      String
+  status         ClaimStatus  @default(DRAFT)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  asset          Asset        @relation(fields: [assetId], references: [id])
+  warranty       Warranty     @relation(fields: [warrantyId], references: [id])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  fileName   String
+  checksum   String
+  mimeType   String
+  size       Int
+  uploadedAt DateTime @default(now())
+}
+
+model ChainProof {
+  id          String   @id @default(cuid())
+  recordType  String
+  recordId    String
+  contentHash String
+  status      String   @default("not_anchored")
+  txHash      String?
+  createdAt   DateTime @default(now())
+}
+
+model ServiceRequest {
+  id             String       @id @default(cuid())
+  reference      String       @unique
+  organizationId String
+  assetId        String
+  workOrderId    String?
+  requesterName  String
+  description    String
+  status         String       @default("new")
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset          Asset        @relation(fields: [assetId], references: [id])
+  workOrder      WorkOrder?   @relation(fields: [workOrderId], references: [id])
+
+  @@index([organizationId, createdAt])
+}
+
+model ActivityEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  workOrderId    String?
+  type           String
+  message        String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workOrder      WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  asset          Asset?       @relation(fields: [assetId], references: [id])
+  assetId        String?
+
+  @@index([organizationId, createdAt])
+}

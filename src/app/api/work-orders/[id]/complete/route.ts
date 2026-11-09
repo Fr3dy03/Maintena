@@ -1,0 +1,5 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+const schema=z.object({checklist:z.array(z.boolean()).length(3),notes:z.string().max(5000).default('')});
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){const parsed=schema.safeParse(await request.json());if(!parsed.success)return NextResponse.json({error:'Complete all required fields.'},{status:400});const {id}=await params;const order=await prisma.workOrder.findFirst({where:{OR:[{id},{number:`WO-${id}`} ]},select:{id:true,assetId:true}});if(!order)return NextResponse.json({status:'saved_on_device'},{status:202});const updated=await prisma.workOrder.update({where:{id:order.id},data:{status:'COMPLETED'},select:{id:true,status:true}});await prisma.serviceRecord.create({data:{workOrderId:order.id,assetId:order.assetId,action:'completed',notes:parsed.data.notes,contentHash:'local-pending-hash'}});return NextResponse.json(updated)}

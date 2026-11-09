@@ -1,0 +1,27 @@
+const fs = require('fs');
+const path = require('path');
+const { JsonRpcProvider, Wallet, Contract, id } = require('ethers');
+const root = path.resolve(__dirname, '..');
+const env = Object.fromEntries(fs.readFileSync(path.join(root, '.env.local'), 'utf8').split(/\r?\n/).filter(Boolean).map(line => { const i=line.indexOf('='); return [line.slice(0,i), line.slice(i+1)]; }));
+const artifact = JSON.parse(fs.readFileSync(path.join(root, 'artifacts', 'MaintenaProofRegistry.json'), 'utf8'));
+(async()=>{
+  const provider = new JsonRpcProvider(env.BOT_PROOF_RPC_URL);
+  if ((await provider.getNetwork()).chainId !== 968n) throw new Error('Unexpected chain');
+  const wallet = new Wallet(env.BOT_TESTNET_PRIVATE_KEY, provider);
+  const contract = new Contract(env.BOT_PROOF_CONTRACT_ADDRESS, artifact.abi, wallet);
+  const assetHash = id('maintena-demo-asset-opaque');
+  const recordHash = id('maintena-demo-service-record-opaque');
+  const contentHash = id('canonical-demo-manifest-v1');
+  const previousHash = '0x' + '00'.repeat(32);
+  const tx = await contract.anchorProof(assetHash, recordHash, contentHash, 1, previousHash);
+  const receipt = await tx.wait(1);
+  const parsed = receipt.logs.map(log => { try { return contract.interface.parseLog(log); } catch { return null; } }).find(log => log?.name === 'ProofAnchored');
+  if (!parsed) throw new Error('ProofAnchored event missing');
+  const confirmations = (await provider.getBlockNumber()) - receipt.blockNumber;
+  console.log(`PROOF_TX=${tx.hash}`);
+  console.log(`PROOF_STATUS=${receipt.status}`);
+  console.log(`PROOF_BLOCK=${receipt.blockNumber}`);
+  console.log(`PROOF_CONFIRMATIONS=${confirmations}`);
+  console.log(`PROOF_EVENT_RECORD_TYPE=${parsed.args.recordType}`);
+  console.log(`EXPLORER=https://scan.bohr.life/tx/${tx.hash}`);
+})().catch(error=>{ console.error(error); process.exit(1); });

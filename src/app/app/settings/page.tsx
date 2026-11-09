@@ -1,0 +1,1 @@
+export default function Settings(){return <><div className="eyebrow">Organisation / configuration</div><h1 className="h1">Settings</h1><div className="card"><h3>BOT Chain evidence</h3><p>Bohr testnet · chain ID 968 · proofs remain optional and operational data stays in PostgreSQL.</p><span className="pill">Configured</span></div></>}

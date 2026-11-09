@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import { canManage, evaluateWarranty } from './warranty';
+describe('warranty evaluation', () => { const base = { startsAt: new Date('2025-01-01'), endsAt: new Date('2026-12-31') }; it('covers an in-range fault', () => expect(evaluateWarranty({...base, occurredAt:new Date('2026-04-01')}).outcome).toBe('potentially_covered')); it('rejects expired coverage', () => expect(evaluateWarranty({...base, occurredAt:new Date('2027-01-01')}).outcome).toBe('outside_coverage')); it('limits management roles', () => { expect(canManage('TECHNICIAN')).toBe(false); expect(canManage('DISPATCHER')).toBe(true); }); });

@@ -1,0 +1,1 @@
+export default function Schedule(){return <><div className="eyebrow">Dispatch / week of November 10</div><h1 className="h1">Schedule</h1><div className="card"><h3>Today · 3 assignments</h3><p>09:00 · Inverter cooling alarm · Kijani Mini-grid</p><p>13:30 · Battery inspection · Riverside offices</p><p>16:00 · Pump pressure check · Workshop</p></div></>}
